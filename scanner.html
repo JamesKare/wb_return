@@ -28,7 +28,13 @@
     background: #1a73e8; color: white; border: none; border-radius: 8px;
     font-size: 16px;
   }
-  #manualInput { max-width: 480px; margin: 16px auto; display: flex; gap: 8px; }
+  #debug {
+    max-width: 480px; margin: 12px auto; padding: 12px;
+    background: #fff; border: 1px solid #ddd; border-radius: 8px;
+    font-size: 13px; color: #333; display: none;
+  }
+  #debug img { max-width: 100%; border-radius: 8px; margin-top: 8px; display: block; }
+  #debug .raw { font-family: monospace; word-break: break-all; background: #f1f1f1; padding: 6px; border-radius: 4px; }
   #manualInput input { flex: 1; padding: 10px; font-size: 16px; border-radius: 8px; border: 1px solid #ccc; }
   #manualInput button { margin: 0; }
 </style>
@@ -39,6 +45,7 @@
 <div id="reader"></div>
 <div id="status">Наведите камеру на QR-код на упаковке</div>
 <div id="result"></div>
+<div id="debug"></div>
 
 <div id="manualInput">
   <input type="text" id="manualCode" placeholder="Или введите номер вручную">
@@ -56,6 +63,33 @@ let isProcessing = false;
 function showResult(cls, html) {
   resultDiv.className = cls;
   resultDiv.innerHTML = html;
+}
+
+function showDebug(rawText, formatName) {
+  const debugDiv = document.getElementById('debug');
+  debugDiv.style.display = 'block';
+
+  let html = '<b>Сырой результат сканирования:</b><br>' +
+    '<div class="raw">' + escapeHtml(rawText) + '</div>' +
+    '<div style="margin-top:6px; color:#666;">Формат: ' + (formatName || 'неизвестно') + '</div>';
+
+  const video = document.querySelector('#reader video');
+  if (video && video.videoWidth) {
+    const canvas = document.createElement('canvas');
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
+    html += '<b>Снимок в момент считывания:</b>' +
+      '<img src="' + canvas.toDataURL('image/jpeg', 0.85) + '">';
+  }
+
+  debugDiv.innerHTML = html;
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
 }
 
 async function submitCode(code) {
@@ -102,7 +136,11 @@ async function submitCode(code) {
   }
 }
 
-function onScanSuccess(decodedText) {
+function onScanSuccess(decodedText, decodedResult) {
+  const formatName = decodedResult && decodedResult.result && decodedResult.result.format
+    ? decodedResult.result.format.formatName
+    : (decodedResult && decodedResult.format ? decodedResult.format : 'QR_CODE');
+  showDebug(decodedText, formatName);
   submitCode(decodedText);
 }
 
