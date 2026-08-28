@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Сканер возвратов WB</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, Roboto, sans-serif;
+    margin: 0; padding: 16px;
+    background: #f5f5f5;
+  }
+  h1 { font-size: 18px; margin-bottom: 12px; }
+  #reader { width: 100%; max-width: 480px; margin: 0 auto; border-radius: 12px; overflow: hidden; }
+  #result {
+    max-width: 480px; margin: 16px auto; padding: 16px;
+    border-radius: 12px; font-size: 15px; line-height: 1.5;
+    display: none;
+  }
+  #result.ok { background: #e6f4ea; border: 1px solid #34a853; display: block; }
+  #result.warn { background: #fef7e0; border: 1px solid #f9ab00; display: block; }
+  #result.error { background: #fce8e6; border: 1px solid #ea4335; display: block; }
+  #status { text-align: center; color: #666; margin: 8px 0; }
+  button {
+    display: block; margin: 12px auto; padding: 12px 24px;
+    background: #1a73e8; color: white; border: none; border-radius: 8px;
+    font-size: 16px;
+  }
+  #manualInput { max-width: 480px; margin: 16px auto; display: flex; gap: 8px; }
+  #manualInput input { flex: 1; padding: 10px; font-size: 16px; border-radius: 8px; border: 1px solid #ccc; }
+  #manualInput button { margin: 0; }
+</style>
+</head>
+<body>
+
+<h1>📦 Сканер возвратов WB</h1>
+<div id="reader"></div>
+<div id="status">Наведите камеру на QR-код на упаковке</div>
+<div id="result"></div>
+
+<div id="manualInput">
+  <input type="text" id="manualCode" placeholder="Или введите номер вручную">
+  <button onclick="submitCode(document.getElementById('manualCode').value)">OK</button>
+</div>
+
+<script>
+// ЗАМЕНИТЕ на ваш URL веб-приложения Apps Script (Deploy → Web app)
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyW96ppJKxgymU5cBWEXjMowDw57LImBPie2AxMVFEsagcga4_v7L-ZqBoINVHTtV3WdQ/exec';
+
+const resultDiv = document.getElementById('result');
+const statusDiv = document.getElementById('status');
+let isProcessing = false;
+
+function showResult(cls, html) {
+  resultDiv.className = cls;
+  resultDiv.innerHTML = html;
+}
+
+async function submitCode(code) {
+  code = (code || '').trim();
+  if (!code || isProcessing) return;
+  isProcessing = true;
+  statusDiv.textContent = 'Отправка...';
+
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      body: JSON.stringify({ code: code })
+    });
+    const data = await res.json();
+
+    if (!data.ok) {
+      showResult('error', '❌ Ошибка: ' + (data.error || 'неизвестная'));
+    } else if (data.found) {
+      showResult('ok', '✅ Найдено:<br>' +
+        '<b>' + (data.data.товар || '') + '</b><br>' +
+        'Статус: ' + (data.data.статус || '—') + '<br>' +
+        'Причина: ' + (data.data.причина || '—') + '<br>' +
+        'SRID: ' + (data.data.srid || '—'));
+    } else {
+      showResult('warn', '⚠️ ' + data.message);
+    }
+  } catch (err) {
+    showResult('error', '❌ Не удалось отправить: ' + err.message);
+  } finally {
+    statusDiv.textContent = 'Наведите камеру на следующий QR-код';
+    isProcessing = false;
+    document.getElementById('manualCode').value = '';
+  }
+}
+
+function onScanSuccess(decodedText) {
+  submitCode(decodedText);
+}
+
+const scanner = new Html5Qrcode('reader');
+scanner.start(
+  { facingMode: 'environment' },
+  { fps: 10, qrbox: 250 },
+  onScanSuccess
+).catch(function (err) {
+  statusDiv.textContent = 'Не удалось запустить камеру: ' + err;
+});
+</script>
+
+</body>
+</html>
