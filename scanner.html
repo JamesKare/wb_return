@@ -7,8 +7,12 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <style>
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, Roboto, sans-serif; margin: 0; padding: 16px; background: #f5f5f5; }
-  h1 { font-size: 18px; margin-bottom: 12px; }
+  body { font-family: -apple-system, Roboto, sans-serif; margin: 0; padding: 16px; background: #f5f5f5; min-height: 100vh; }
+  h1 { font-size: 18px; margin-bottom: 12px; text-align: center; }
+  @media (max-width: 380px) {
+    #last4 { font-size: 24px; padding: 14px; }
+    h1 { font-size: 16px; }
+  }
 
   #storeSelect { max-width: 480px; margin: 0 auto 12px; display: flex; gap: 8px; }
   #storeSelect button {
@@ -82,7 +86,7 @@
   <button id="submitBtn" onclick="lookup()">OK</button>
 </div>
 <div style="max-width:480px; margin:8px auto; text-align:center; color:#999; font-size:13px;">
-  Введите последние 4 цифры номера стикера (ШК/номер под кодом)
+  Введите последние 4 цифры номера стикера — поиск запустится автоматически
 </div>
 
 <div id="result"></div>
@@ -98,7 +102,7 @@
 </div>
 
 <script>
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz0EJsK67ezQpG0VPI9E7il0J5ehuVgzNOlGqoVFe8tnq5LhX-BT8L_17H8PiU1Yon4eQ/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyW96ppJKxgymU5cBWEXjMowDw57LImBPie2AxMVFEsagcga4_v7L-ZqBoINVHTtV3WdQ/exec';
 
 const resultDiv = document.getElementById('result');
 const candidatesDiv = document.getElementById('candidates');
@@ -204,6 +208,14 @@ async function lookup() {
 
 last4Input.addEventListener('keydown', function (e) {
   if (e.key === 'Enter') lookup();
+});
+
+// ===== Автопоиск сразу по вводу 4-й цифры =====
+last4Input.addEventListener('input', function () {
+  const val = last4Input.value.trim();
+  if (/^\d{4}$/.test(val)) {
+    lookup();
+  }
 });
 
 // ===== Опциональный сканер QR (редкие случаи / отладка) =====
