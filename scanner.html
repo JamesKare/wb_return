@@ -13,6 +13,15 @@
     background: #f5f5f5;
   }
   h1 { font-size: 18px; margin-bottom: 12px; }
+
+  #storeSelect { max-width: 480px; margin: 0 auto 12px; display: flex; gap: 8px; }
+  #storeSelect button {
+    flex: 1; padding: 12px; border-radius: 8px; border: 2px solid #1a73e8;
+    background: white; color: #1a73e8; font-size: 15px; font-weight: 600;
+  }
+  #storeSelect button.active { background: #1a73e8; color: white; }
+  #storeStatus { max-width: 480px; margin: 0 auto 12px; text-align: center; color: #666; font-size: 13px; }
+
   #reader { width: 100%; max-width: 480px; margin: 0 auto; border-radius: 12px; overflow: hidden; }
   #result {
     max-width: 480px; margin: 16px auto; padding: 16px;
@@ -22,12 +31,15 @@
   #result.ok { background: #e6f4ea; border: 1px solid #34a853; display: block; }
   #result.warn { background: #fef7e0; border: 1px solid #f9ab00; display: block; }
   #result.error { background: #fce8e6; border: 1px solid #ea4335; display: block; }
-  #status { text-align: center; color: #666; margin: 8px 0; }
-  button {
-    display: block; margin: 12px auto; padding: 12px 24px;
-    background: #1a73e8; color: white; border: none; border-radius: 8px;
-    font-size: 16px;
+  #result .badge {
+    display: inline-block; padding: 4px 10px; border-radius: 20px;
+    font-size: 13px; font-weight: 700; margin-bottom: 8px;
   }
+  #result .badge.defect { background: #ea4335; color: white; }
+  #result .badge.refusal { background: #4285f4; color: white; }
+
+  #status { text-align: center; color: #666; margin: 8px 0; }
+
   #debug {
     max-width: 480px; margin: 12px auto; padding: 12px;
     background: #fff; border: 1px solid #ddd; border-radius: 8px;
@@ -35,30 +47,61 @@
   }
   #debug img { max-width: 100%; border-radius: 8px; margin-top: 8px; display: block; }
   #debug .raw { font-family: monospace; word-break: break-all; background: #f1f1f1; padding: 6px; border-radius: 4px; }
+
+  button.primary {
+    display: block; margin: 12px auto; padding: 12px 24px;
+    background: #1a73e8; color: white; border: none; border-radius: 8px;
+    font-size: 16px;
+  }
+  #manualInput { max-width: 480px; margin: 16px auto; display: flex; gap: 8px; }
   #manualInput input { flex: 1; padding: 10px; font-size: 16px; border-radius: 8px; border: 1px solid #ccc; }
-  #manualInput button { margin: 0; }
 </style>
 </head>
 <body>
 
 <h1>📦 Сканер возвратов WB</h1>
+
+<div id="storeSelect">
+  <button id="btnStore1" onclick="selectStore('1')">1-й Магазин</button>
+  <button id="btnStore3" onclick="selectStore('3')">3-й Магазин</button>
+</div>
+<div id="storeStatus">Магазин не выбран</div>
+
 <div id="reader"></div>
-<div id="status">Наведите камеру на QR-код на упаковке</div>
+<div id="status">Наведите камеру на QR-код</div>
 <div id="result"></div>
 <div id="debug"></div>
 
 <div id="manualInput">
   <input type="text" id="manualCode" placeholder="Или введите номер вручную">
-  <button onclick="submitCode(document.getElementById('manualCode').value)">OK</button>
+  <button class="primary" style="margin:0;" onclick="submitCode(document.getElementById('manualCode').value)">OK</button>
 </div>
 
 <script>
 // ЗАМЕНИТЕ на ваш URL веб-приложения Apps Script (Deploy → Web app)
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbyW96ppJKxgymU5cBWEXjMowDw57LImBPie2AxMVFEsagcga4_v7L-ZqBoINVHTtV3WdQ/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbx6LPyDZDyMIpJ4uGcokqghOEFzRz2ZmZdxgd8UhMvNfq7jF0KdVOqgRjdKU7C1QkNuRA/exec';
 
 const resultDiv = document.getElementById('result');
 const statusDiv = document.getElementById('status');
+const storeStatusDiv = document.getElementById('storeStatus');
 let isProcessing = false;
+let selectedStore = localStorage.getItem('wb_selected_store') || '';
+
+function updateStoreUI() {
+  document.getElementById('btnStore1').classList.toggle('active', selectedStore === '1');
+  document.getElementById('btnStore3').classList.toggle('active', selectedStore === '3');
+  storeStatusDiv.textContent = selectedStore
+    ? 'Выбран: ' + (selectedStore === '1' ? '1-й Магазин' : '3-й Магазин')
+    : 'Магазин не выбран — выберите перед сканированием';
+}
+
+function selectStore(key) {
+  selectedStore = key;
+  localStorage.setItem('wb_selected_store', key);
+  updateStoreUI();
+}
+
+updateStoreUI();
 
 function showResult(cls, html) {
   resultDiv.className = cls;
@@ -96,12 +139,15 @@ async function submitCode(code) {
   code = (code || '').trim();
   if (!code || isProcessing) return;
 
-  // Стикеры WB содержат чистое число (обычно 10-15 цифр).
-  // Если считанное значение не похоже на число — это, скорее всего,
-  // ошибка распознавания (не тот формат кода), а не реальный номер.
+  if (!selectedStore) {
+    showResult('warn', '⚠️ Сначала выберите магазин (кнопки сверху).');
+    return;
+  }
+
+  // Стикеры WB содержат чистое число (обычно 6-15 цифр).
   if (!/^\d{6,15}$/.test(code)) {
-    showResult('warn', '⚠️ Похоже, код распознан неверно ("' + code + '"). ' +
-      'Введите номер вручную по цифрам на стикере (обычно 10-15 цифр).');
+    showResult('warn', '⚠️ Похоже, код распознан неверно ("' + escapeHtml(code) + '"). ' +
+      'Введите номер вручную по цифрам на стикере.');
     document.getElementById('manualCode').value = code.replace(/\D/g, '');
     return;
   }
@@ -112,18 +158,25 @@ async function submitCode(code) {
   try {
     const res = await fetch(APPS_SCRIPT_URL, {
       method: 'POST',
-      body: JSON.stringify({ code: code })
+      body: JSON.stringify({ code: code, magazin: selectedStore })
     });
     const data = await res.json();
 
     if (!data.ok) {
       showResult('error', '❌ Ошибка: ' + (data.error || 'неизвестная'));
     } else if (data.found) {
-      showResult('ok', '✅ Найдено:<br>' +
+      let badge = '';
+      if (data.reasonType === 'defect') {
+        badge = '<div class="badge defect">⚠️ БРАК — впишите дату заявки и SRID вручную</div>';
+      } else if (data.reasonType === 'refusal') {
+        badge = '<div class="badge refusal">↩️ ОТКАЗ</div>';
+      }
+      showResult('ok', badge +
+        '✅ Найдено:<br>' +
         '<b>' + (data.data.товар || '') + '</b><br>' +
         'Статус: ' + (data.data.статус || '—') + '<br>' +
         'Причина: ' + (data.data.причина || '—') + '<br>' +
-        'SRID: ' + (data.data.srid || '—'));
+        'SRID: ' + (data.data.srid || '— (заполните вручную)'));
     } else {
       showResult('warn', '⚠️ ' + data.message);
     }
