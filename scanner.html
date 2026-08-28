@@ -3,15 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Сканер возвратов WB</title>
+<title>Возвраты WB — ввод по номеру</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 <style>
   * { box-sizing: border-box; }
-  body {
-    font-family: -apple-system, Roboto, sans-serif;
-    margin: 0; padding: 16px;
-    background: #f5f5f5;
-  }
+  body { font-family: -apple-system, Roboto, sans-serif; margin: 0; padding: 16px; background: #f5f5f5; }
   h1 { font-size: 18px; margin-bottom: 12px; }
 
   #storeSelect { max-width: 480px; margin: 0 auto 12px; display: flex; gap: 8px; }
@@ -20,46 +16,60 @@
     background: white; color: #1a73e8; font-size: 15px; font-weight: 600;
   }
   #storeSelect button.active { background: #1a73e8; color: white; }
-  #storeStatus { max-width: 480px; margin: 0 auto 12px; text-align: center; color: #666; font-size: 13px; }
+  #storeStatus { max-width: 480px; margin: 0 auto 16px; text-align: center; color: #666; font-size: 13px; }
 
-  #reader { width: 100%; max-width: 480px; margin: 0 auto; border-radius: 12px; overflow: hidden; }
+  #inputBlock { max-width: 480px; margin: 0 auto; display: flex; gap: 8px; }
+  #last4 {
+    flex: 1; padding: 16px; font-size: 28px; text-align: center;
+    letter-spacing: 4px; border-radius: 10px; border: 2px solid #ccc;
+  }
+  #submitBtn {
+    padding: 0 24px; background: #1a73e8; color: white; border: none;
+    border-radius: 10px; font-size: 16px; font-weight: 600;
+  }
+  #submitBtn:disabled { background: #aac1e8; }
+
   #result {
     max-width: 480px; margin: 16px auto; padding: 16px;
-    border-radius: 12px; font-size: 15px; line-height: 1.5;
-    display: none;
+    border-radius: 12px; font-size: 15px; line-height: 1.5; display: none;
   }
   #result.ok { background: #e6f4ea; border: 1px solid #34a853; display: block; }
   #result.warn { background: #fef7e0; border: 1px solid #f9ab00; display: block; }
   #result.error { background: #fce8e6; border: 1px solid #ea4335; display: block; }
-  #result .badge {
-    display: inline-block; padding: 4px 10px; border-radius: 20px;
-    font-size: 13px; font-weight: 700; margin-bottom: 8px;
-  }
+  #result .badge { display: inline-block; padding: 4px 10px; border-radius: 20px; font-size: 13px; font-weight: 700; margin-bottom: 8px; }
   #result .badge.defect { background: #ea4335; color: white; }
   #result .badge.refusal { background: #4285f4; color: white; }
 
-  #status { text-align: center; color: #666; margin: 8px 0; }
-
-  #debug {
-    max-width: 480px; margin: 12px auto; padding: 12px;
-    background: #fff; border: 1px solid #ddd; border-radius: 8px;
-    font-size: 13px; color: #333; display: none;
+  #candidates { max-width: 480px; margin: 16px auto; display: none; }
+  .candidate {
+    background: white; border: 1px solid #ddd; border-radius: 10px;
+    padding: 12px; margin-bottom: 8px; cursor: pointer;
   }
-  #debug img { max-width: 100%; border-radius: 8px; margin-top: 8px; display: block; }
-  #debug .raw { font-family: monospace; word-break: break-all; background: #f1f1f1; padding: 6px; border-radius: 4px; }
+  .candidate:active { background: #eef3fc; }
+  .candidate b { display: block; }
+  .candidate span { color: #666; font-size: 13px; }
 
-  button.primary {
-    display: block; margin: 12px auto; padding: 12px 24px;
-    background: #1a73e8; color: white; border: none; border-radius: 8px;
-    font-size: 16px;
+  #scannerToggle {
+    max-width: 480px; margin: 20px auto 0; text-align: center;
   }
-  #manualInput { max-width: 480px; margin: 16px auto; display: flex; gap: 8px; }
-  #manualInput input { flex: 1; padding: 10px; font-size: 16px; border-radius: 8px; border: 1px solid #ccc; }
+  #scannerToggle button {
+    background: none; border: none; color: #888; font-size: 13px;
+    text-decoration: underline; padding: 8px;
+  }
+  #scannerBlock { max-width: 480px; margin: 12px auto; display: none; }
+  #reader { width: 100%; border-radius: 12px; overflow: hidden; }
+  #scanStatus { text-align: center; color: #666; margin: 8px 0; font-size: 13px; }
+  #scanDebug {
+    margin-top: 12px; padding: 12px; background: #fff; border: 1px solid #ddd;
+    border-radius: 8px; font-size: 13px; color: #333; display: none;
+  }
+  #scanDebug img { max-width: 100%; border-radius: 8px; margin-top: 8px; display: block; }
+  #scanDebug .raw { font-family: monospace; word-break: break-all; background: #f1f1f1; padding: 6px; border-radius: 4px; }
 </style>
 </head>
 <body>
 
-<h1>📦 Сканер возвратов WB</h1>
+<h1>📦 Возвраты WB</h1>
 
 <div id="storeSelect">
   <button id="btnStore1" onclick="selectStore('1')">1-й Магазин</button>
@@ -67,54 +77,187 @@
 </div>
 <div id="storeStatus">Магазин не выбран</div>
 
-<div id="reader"></div>
-<div id="status">Наведите камеру на QR-код</div>
-<div id="result"></div>
-<div id="debug"></div>
+<div id="inputBlock">
+  <input type="tel" id="last4" maxlength="4" placeholder="0000" inputmode="numeric">
+  <button id="submitBtn" onclick="lookup()">OK</button>
+</div>
+<div style="max-width:480px; margin:8px auto; text-align:center; color:#999; font-size:13px;">
+  Введите последние 4 цифры номера стикера (ШК/номер под кодом)
+</div>
 
-<div id="manualInput">
-  <input type="text" id="manualCode" placeholder="Или введите номер вручную">
-  <button class="primary" style="margin:0;" onclick="submitCode(document.getElementById('manualCode').value)">OK</button>
+<div id="result"></div>
+<div id="candidates"></div>
+
+<div id="scannerToggle">
+  <button onclick="toggleScanner()" id="scannerToggleBtn">📷 Показать сканер QR (редкие случаи / отладка)</button>
+</div>
+<div id="scannerBlock">
+  <div id="reader"></div>
+  <div id="scanStatus">Наведите камеру на QR-код</div>
+  <div id="scanDebug"></div>
 </div>
 
 <script>
-// ЗАМЕНИТЕ на ваш URL веб-приложения Apps Script (Deploy → Web app)
-const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzqlkD_FhbjtGl1cDgGDKmhMaCpbBk_fqGm08UtOZFOkOhlsYwjLy5wik1tGlL5kTX2YQ/exec';
+const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz0EJsK67ezQpG0VPI9E7il0J5ehuVgzNOlGqoVFe8tnq5LhX-BT8L_17H8PiU1Yon4eQ/exec';
 
 const resultDiv = document.getElementById('result');
-const statusDiv = document.getElementById('status');
+const candidatesDiv = document.getElementById('candidates');
 const storeStatusDiv = document.getElementById('storeStatus');
-let isProcessing = false;
+const last4Input = document.getElementById('last4');
+const submitBtn = document.getElementById('submitBtn');
 let selectedStore = localStorage.getItem('wb_selected_store') || '';
+let isProcessing = false;
 
 function updateStoreUI() {
   document.getElementById('btnStore1').classList.toggle('active', selectedStore === '1');
   document.getElementById('btnStore3').classList.toggle('active', selectedStore === '3');
   storeStatusDiv.textContent = selectedStore
     ? 'Выбран: ' + (selectedStore === '1' ? '1-й Магазин' : '3-й Магазин')
-    : 'Магазин не выбран — выберите перед сканированием';
+    : 'Магазин не выбран — выберите перед вводом';
 }
-
 function selectStore(key) {
   selectedStore = key;
   localStorage.setItem('wb_selected_store', key);
   updateStoreUI();
 }
-
 updateStoreUI();
+last4Input.focus();
 
 function showResult(cls, html) {
   resultDiv.className = cls;
   resultDiv.innerHTML = html;
 }
+function clearCandidates() {
+  candidatesDiv.style.display = 'none';
+  candidatesDiv.innerHTML = '';
+}
 
-function showDebug(rawText, formatName) {
-  const debugDiv = document.getElementById('debug');
+async function callApi(payload) {
+  const res = await fetch(APPS_SCRIPT_URL, { method: 'POST', body: JSON.stringify(payload) });
+  return res.json();
+}
+
+function renderResult(data) {
+  if (!data.ok) {
+    showResult('error', '❌ Ошибка: ' + (data.error || 'неизвестная'));
+  } else if (data.found) {
+    let badge = '';
+    if (data.reasonType === 'defect') badge = '<div class="badge defect">⚠️ БРАК — впишите дату заявки, место обращения, SRID вручную</div>';
+    else if (data.reasonType === 'refusal') badge = '<div class="badge refusal">↩️ ОТКАЗ — впишите место обращения вручную</div>';
+    showResult('ok', badge + '✅ Найдено:<br><b>' + (data.data.товар || '') + '</b><br>' +
+      'Статус: ' + (data.data.статус || '—') + '<br>Причина: ' + (data.data.причина || '—'));
+  } else if (data.multiple) {
+    showResult('warn', '⚠️ Найдено несколько совпадений — выберите нужное ниже:');
+    candidatesDiv.style.display = 'block';
+    candidatesDiv.innerHTML = data.candidates.map(function (c, i) {
+      return '<div class="candidate" onclick="confirmCandidate(' + i + ')">' +
+        '<b>' + (c.товар || 'без названия') + '</b>' +
+        '<span>' + (c.причина || '') + ' · ' + (c.дата || '') + '</span><br>' +
+        '<span>stickerId: <b>' + (c.stickerId || '—') + '</b> · shkId: <b>' + (c.shkId || '—') + '</b></span>' +
+        '</div>';
+    }).join('');
+    window._candidates = data.candidates;
+  } else {
+    showResult('warn', '⚠️ ' + data.message);
+  }
+}
+
+async function confirmCandidate(i) {
+  const c = window._candidates[i];
+  clearCandidates();
+  statusBusy(true);
+  try {
+    const data = await callApi({ action: 'confirm', shkId: c.shkId, magazin: selectedStore });
+    renderResult(data);
+  } catch (err) {
+    showResult('error', '❌ ' + err.message);
+  } finally {
+    statusBusy(false);
+  }
+}
+
+function statusBusy(busy) {
+  isProcessing = busy;
+  submitBtn.disabled = busy;
+  submitBtn.textContent = busy ? '...' : 'OK';
+}
+
+async function lookup() {
+  const last4 = last4Input.value.trim();
+  if (isProcessing) return;
+  if (!selectedStore) { showResult('warn', '⚠️ Сначала выберите магазин.'); return; }
+  if (!/^\d{4}$/.test(last4)) { showResult('warn', '⚠️ Введите ровно 4 цифры.'); return; }
+
+  clearCandidates();
+  statusBusy(true);
+  try {
+    const data = await callApi({ action: 'lookup', last4: last4, magazin: selectedStore });
+    renderResult(data);
+  } catch (err) {
+    showResult('error', '❌ Не удалось отправить: ' + err.message);
+  } finally {
+    statusBusy(false);
+    last4Input.value = '';
+    last4Input.focus();
+  }
+}
+
+last4Input.addEventListener('keydown', function (e) {
+  if (e.key === 'Enter') lookup();
+});
+
+// ===== Опциональный сканер QR (редкие случаи / отладка) =====
+let scannerInstance = null;
+let scannerVisible = false;
+
+function toggleScanner() {
+  scannerVisible = !scannerVisible;
+  const block = document.getElementById('scannerBlock');
+  const btn = document.getElementById('scannerToggleBtn');
+
+  if (scannerVisible) {
+    block.style.display = 'block';
+    btn.textContent = '✖ Скрыть сканер';
+    startScanner();
+  } else {
+    block.style.display = 'none';
+    btn.textContent = '📷 Показать сканер QR (редкие случаи / отладка)';
+    stopScanner();
+  }
+}
+
+function startScanner() {
+  scannerInstance = new Html5Qrcode('reader', {
+    formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
+  });
+  scannerInstance.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: 250 },
+    onScanSuccess
+  ).catch(function (err) {
+    document.getElementById('scanStatus').textContent = 'Не удалось запустить камеру: ' + err;
+  });
+}
+
+function stopScanner() {
+  if (scannerInstance) {
+    scannerInstance.stop().catch(function () {});
+    scannerInstance = null;
+  }
+}
+
+function onScanSuccess(decodedText, decodedResult) {
+  const formatName = decodedResult && decodedResult.result && decodedResult.result.format
+    ? decodedResult.result.format.formatName : 'QR_CODE';
+
+  const debugDiv = document.getElementById('scanDebug');
   debugDiv.style.display = 'block';
 
   let html = '<b>Сырой результат сканирования:</b><br>' +
-    '<div class="raw">' + escapeHtml(rawText) + '</div>' +
-    '<div style="margin-top:6px; color:#666;">Формат: ' + (formatName || 'неизвестно') + '</div>';
+    '<div class="raw">' + escapeHtml(decodedText) + '</div>' +
+    '<div style="margin-top:6px; color:#666;">Формат: ' + formatName + '</div>' +
+    '<div style="margin-top:6px; color:#999;">Этот код не сопоставляется с отчётом автоматически — ' +
+    'найдите на стикере читаемые цифры и введите их в поле выше.</div>';
 
   const video = document.querySelector('#reader video');
   if (video && video.videoWidth) {
@@ -122,8 +265,7 @@ function showDebug(rawText, formatName) {
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext('2d').drawImage(video, 0, 0, canvas.width, canvas.height);
-    html += '<b>Снимок в момент считывания:</b>' +
-      '<img src="' + canvas.toDataURL('image/jpeg', 0.85) + '">';
+    html += '<b>Снимок в момент считывания:</b><img src="' + canvas.toDataURL('image/jpeg', 0.85) + '">';
   }
 
   debugDiv.innerHTML = html;
@@ -134,79 +276,6 @@ function escapeHtml(str) {
   div.textContent = str;
   return div.innerHTML;
 }
-
-async function submitCode(code) {
-  code = (code || '').trim();
-  if (!code || isProcessing) return;
-
-  if (!selectedStore) {
-    showResult('warn', '⚠️ Сначала выберите магазин (кнопки сверху).');
-    return;
-  }
-
-  // Стикеры WB содержат чистое число (обычно 6-15 цифр).
-  if (!/^\d{6,15}$/.test(code)) {
-    showResult('warn', '⚠️ Похоже, код распознан неверно ("' + escapeHtml(code) + '"). ' +
-      'Введите номер вручную по цифрам на стикере.');
-    document.getElementById('manualCode').value = code.replace(/\D/g, '');
-    return;
-  }
-
-  isProcessing = true;
-  statusDiv.textContent = 'Отправка...';
-
-  try {
-    const res = await fetch(APPS_SCRIPT_URL, {
-      method: 'POST',
-      body: JSON.stringify({ code: code, magazin: selectedStore })
-    });
-    const data = await res.json();
-
-    if (!data.ok) {
-      showResult('error', '❌ Ошибка: ' + (data.error || 'неизвестная'));
-    } else if (data.found) {
-      let badge = '';
-      if (data.reasonType === 'defect') {
-        badge = '<div class="badge defect">⚠️ БРАК — впишите дату заявки и SRID вручную</div>';
-      } else if (data.reasonType === 'refusal') {
-        badge = '<div class="badge refusal">↩️ ОТКАЗ</div>';
-      }
-      showResult('ok', badge +
-        '✅ Найдено:<br>' +
-        '<b>' + (data.data.товар || '') + '</b><br>' +
-        'Статус: ' + (data.data.статус || '—') + '<br>' +
-        'Причина: ' + (data.data.причина || '—') + '<br>' +
-        'SRID: ' + (data.data.srid || '— (заполните вручную)'));
-    } else {
-      showResult('warn', '⚠️ ' + data.message);
-    }
-  } catch (err) {
-    showResult('error', '❌ Не удалось отправить: ' + err.message);
-  } finally {
-    statusDiv.textContent = 'Наведите камеру на следующий QR-код';
-    isProcessing = false;
-    document.getElementById('manualCode').value = '';
-  }
-}
-
-function onScanSuccess(decodedText, decodedResult) {
-  const formatName = decodedResult && decodedResult.result && decodedResult.result.format
-    ? decodedResult.result.format.formatName
-    : (decodedResult && decodedResult.format ? decodedResult.format : 'QR_CODE');
-  showDebug(decodedText, formatName);
-  submitCode(decodedText);
-}
-
-const scanner = new Html5Qrcode('reader', {
-  formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ]
-});
-scanner.start(
-  { facingMode: 'environment' },
-  { fps: 10, qrbox: 250 },
-  onScanSuccess
-).catch(function (err) {
-  statusDiv.textContent = 'Не удалось запустить камеру: ' + err;
-});
 </script>
 
 </body>
